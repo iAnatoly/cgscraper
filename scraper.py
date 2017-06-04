@@ -13,6 +13,7 @@ from lxml import html
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
+MAX_PAGE_NUM = 10
 
 class Scraper(object):
     """ Implements the scraping for certain website. Config is injected into constructor. """
@@ -101,7 +102,7 @@ class Scraper(object):
                 if not first and title.startswith('Make:'):
                     first = current_post_id
 
-            if current_post_id == last:
+            if current_post_id == last or pagenum>MAX_PAGE_NUM:
                 print("and done")
                 break
 
