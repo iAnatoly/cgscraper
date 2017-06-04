@@ -46,7 +46,7 @@ class Scraper(object):
             server.quit()
 
         except Exception as ex:
-            print "\nError sending out email: {0}.".format(ex)
+            print("\nError sending out email: {0}.".format(ex))
             raise ex
 
     def fetch_content(self, pagenum):
