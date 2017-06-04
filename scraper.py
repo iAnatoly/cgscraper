@@ -3,6 +3,7 @@ import re
 import json
 import smtplib
 import sys
+import os
 from email.mime.text import MIMEText
 
 import requests
@@ -117,8 +118,11 @@ def main():
     with open('scraper.config.json') as json_data_file:
         config = json.load(json_data_file)
 
+    # override password through an env variable:
+    config['email']['smtp']['pass'] = os.getenv('SCRAPER_SMTP_PASS', config['email']['smtp']['pass'])
+
     scraper = Scraper(config)
     scraper.scrape()
 
-
-main()
+if __name__ == '__main__':
+    main()
