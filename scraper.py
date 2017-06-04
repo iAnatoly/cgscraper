@@ -1,115 +1,124 @@
-from lxml import html
+""" Scrapes a certain forum for new posts containing certain keywords """
+import re
+import json
+import smtplib
+import sys
 from email.mime.text import MIMEText
 
 import requests
-import re
-import json
+from lxml import html
 
-import smtplib
 
-import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-class Scraper:
-	def __init__(self,config):
-		self.config = config
 
-	def send_email(self, result):
+class Scraper(object):
+    """ Implements the scraping for certain website. Config is injected into constructor. """
 
-		recipients = self.config['email']['recipients']
-		subject = self.config['email']['subject']
-		mail_from = self.config['email']['sender']
-		smtpserver = self.config['email']['smtp']['server']
-		smtpuser = self.config['email']['smtp']['user']
-		smtppass = self.config['email']['smtp']['pass']
+    def __init__(self, config):
+        self.config = config
 
-		try:
-		    server = smtplib.SMTP(smtpserver)
-		    server.set_debuglevel(False)
-		    server.ehlo()
-		    server.starttls()
-		    server.login(smtpuser, smtppass)
+    def send_email(self, result):
+        """ sends a well-formatted email over authenticates TLS SMTP connection. """
 
-		    msg = MIMEText(result, 'plain')
-		    msg['Subject'] = subject
-		    msg['From'] = 'Calguns Scraper <{}>'.format(mail_from)
-		    msg['To'] = ';'.join(recipients)
+        recipients = self.config['email']['recipients']
+        subject = self.config['email']['subject']
+        mail_from = self.config['email']['sender']
+        smtpserver = self.config['email']['smtp']['server']
+        smtpuser = self.config['email']['smtp']['user']
+        smtppass = self.config['email']['smtp']['pass']
 
-		    server.sendmail(mail_from, recipients, msg.as_string())
+        try:
+            server = smtplib.SMTP(smtpserver)
+            server.set_debuglevel(False)
+            server.ehlo()
+            server.starttls()
+            server.login(smtpuser, smtppass)
 
-		    server.quit()
+            msg = MIMEText(result, 'plain')
+            msg['Subject'] = subject
+            msg['From'] = 'Calguns Scraper <{}>'.format(mail_from)
+            msg['To'] = ';'.join(recipients)
 
-		except Exception as e:
-		    print "\nError sending out email: {0}.".format(e)
-		    raise e
-	
-	def fetch_content(self, pagenum):
-		print('Fetching page {}'.format(pagenum))
-		url_template = self.config['url_template']
-		url = url_template.format(pagenum)
-		page = requests.get(url)
-		return page.content 
+            server.sendmail(mail_from, recipients, msg.as_string())
+            server.quit()
 
-	def scrape(self):
-		first = None
-		with open('scraper.last') as f:
-			last = f.readline().strip()
+        except Exception as ex:
+            print "\nError sending out email: {0}.".format(ex)
+            raise ex
 
-		print('last: "{}"'.format(last))
+    def fetch_content(self, pagenum):
+        """ Fetches content for a specific page on the forum. """
+        print('Fetching page {}'.format(pagenum))
+        url_template = self.config['url_template']
+        url = url_template.format(pagenum)
+        page = requests.get(url)
+        return page.content
 
-		targets = []
-		for target in self.config['scraping_targets']:
-			targets.append(re.compile(target, flags=re.IGNORECASE))
+    def scrape(self):
+        """ Implements scraping algorithm. """
 
-		pagenum = 1
+        first = None
+        with open('scraper.last') as marker_file:
+            last = marker_file.readline().strip()
 
-		while(True):
+        print('last: "{}"'.format(last))
 
-			content = self.fetch_content(pagenum)
-			tree = html.fromstring(content)
+        targets = []
+        for target in self.config['scraping_targets']:
+            targets.append(re.compile(target, flags=re.IGNORECASE))
 
-			postings = tree.xpath('//td[starts-with(@id,"td_threadtitle_")]')
-			
-			if not postings:
-				print("no more posts")
-				break
+        pagenum = 1
+        current_post_id = None
 
-			for posting in postings:
-				id = posting.get('id')
-				title = posting.get('title').replace('\n','')
+        while True:
 
-				if id == last:
-					print("done")
-					break
+            content = self.fetch_content(pagenum)
+            tree = html.fromstring(content)
 
-				for regex in targets:
-					if regex.search(title):
-						print('*** MATCH ***')
-						print(title)
-						self.send_email(title)
+            postings = tree.xpath('//td[starts-with(@id,"td_threadtitle_")]')
 
-				if not first and title.startswith('Make:'):
-					first = id			
+            if not postings:
+                print("no more posts")
+                break
 
-			
-			if id == last:
-				print("and done")
-				break
+            for posting in postings:
+                current_post_id = posting.get('id')
+                title = posting.get('title').replace('\n', '')
 
-			pagenum += 1
+                if current_post_id == last:
+                    print("done")
+                    break
 
-		if first:
-			print('saving {} as current position'.format(first))
-			with open('scraper.last','w') as f:
-				f.write(first)
+                for regex in targets:
+                    if regex.search(title):
+                        print('*** MATCH ***')
+                        print(title)
+                        self.send_email(title)
+
+                if not first and title.startswith('Make:'):
+                    first = current_post_id
+
+            if current_post_id == last:
+                print("and done")
+                break
+
+            pagenum += 1
+
+        if first:
+            print('saving {} as current position'.format(first))
+            with open('scraper.last', 'w') as marker_file:
+                marker_file.write(first)
+
 
 def main():
-	with open('scraper.config.json') as json_data_file:
-		config = json.load(json_data_file)
+    """ Reads config, instantiates scraper, runs scraper """
+    with open('scraper.config.json') as json_data_file:
+        config = json.load(json_data_file)
 
-	scraper = Scraper(config)
-	scraper.scrape()	
+    scraper = Scraper(config)
+    scraper.scrape()
 
 
 main()
