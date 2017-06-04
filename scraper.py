@@ -1,5 +1,7 @@
 from lxml import html
 import requests
+import re
+
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -11,10 +13,17 @@ with open('scraper.last') as f:
 print('last: "{}"'.format(last))
 
 url = 'https://www.calguns.net/calgunforum/forumdisplay.php?f=332&order=desc&page={}'
-targets = ['tactical\s+sport', 'cz.*75.*ts']
+targets = [
+	re.compile('cz.*shadow', flags=re.IGNORECASE), 
+	re.compile('tactical\s+sport', flags=re.IGNORECASE), 
+	re.compile('tacsport', flags=re.IGNORECASE), 
+	re.compile('cz.*75.*ts', flags=re.IGNORECASE),
+	re.compile('sig.*226', flags=re.IGNORECASE)
+]
 
 pagenum = 1
 while(True):
+	print('Fetching page {}'.format(pagenum))
 	page = requests.get(url.format(pagenum))
 	content = page.content #.decode('ISO-8859-1') #.encode('ascii', 'ignore')
 	tree = html.fromstring(content)
@@ -35,14 +44,18 @@ while(True):
 			print("done")
 			break
 
-		if not title.startswith('Make:'):
-			print ('Skipping: {}'.format(str(title[:20])))
-			continue
+		#if not title.startswith('Make:'):
+		#	print ('Skipping: {}'.format(str(title[:20])))
+		#	continue
+		
+		for regex in targets:
+			if regex.search(title):
+				print('*** MATCH ***')
+				print(title)
 
-		print(id, title)
-
-		if not first and title.startswith('Model:'):
+		if not first and title.startswith('Make:'):
 			first = id			
+
 	
 	if id == last:
 		print("done")
@@ -50,7 +63,7 @@ while(True):
 
 	pagenum += 1
 
-
-with open('scraper.last','w') as f:
-	print('saving {} as current position'.format(first))
-	f.write(first)
+if first:
+	with open('scraper.last','w') as f:
+		print('saving {} as current position'.format(first))
+		f.write(first)
