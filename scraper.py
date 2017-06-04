@@ -1,10 +1,47 @@
 from lxml import html
+from email.mime.text import MIMEText
+
 import requests
 import re
+import json
+
+import smtplib
 
 import sys
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
+
+def sendEmail(result):
+	with open('config.json') as json_data_file:
+    		config = json.load(json_data_file)
+
+	recipients = config['recipients']
+	subject = config['subject']
+	mail_from = config['sender']
+	smtpserver = config['smtp']['server']
+	smtpuser = config['smtp']['user']
+	smtppass = config['smtp']['pass']
+
+        try:
+            server = smtplib.SMTP(smtpserver)
+            server.set_debuglevel(False)
+            server.ehlo()
+            server.starttls()
+            server.login(smtpuser, smtppass)
+
+            msg = MIMEText(result, 'plain')
+            msg['Subject'] = subject
+            msg['From'] = 'Calguns Scraper <{}>'.format(mail_from)
+            msg['To'] = ';'.join(recipients)
+
+            server.sendmail(mail_from, recipients, msg.as_string())
+
+            server.quit()
+
+        except Exception as e:
+            print "\nError sending out email: {0}.".format(e)
+	    raise e
 
 first = None
 with open('scraper.last') as f:
@@ -18,14 +55,13 @@ targets = [
 	re.compile('tactical\s+sport', flags=re.IGNORECASE), 
 	re.compile('tacsport', flags=re.IGNORECASE), 
 	re.compile('cz.*75.*ts', flags=re.IGNORECASE),
-	re.compile('sig.*226', flags=re.IGNORECASE)
 ]
 
 pagenum = 1
 while(True):
 	print('Fetching page {}'.format(pagenum))
 	page = requests.get(url.format(pagenum))
-	content = page.content #.decode('ISO-8859-1') #.encode('ascii', 'ignore')
+	content = page.content 
 	tree = html.fromstring(content)
 
 	postings = tree.xpath('//td[starts-with(@id,"td_threadtitle_")]')
@@ -35,8 +71,6 @@ while(True):
 		break
 
 	for posting in postings:
-		# .get('title')
-		# 'Make: Eaa (Tanfoglio) \n \nModel: Stock 2 \n \nCaliber: 9mm  \n \nLocation (city or county): Santa Clara \n \nPrice: $1950'
 		id = posting.get('id')
 		title = posting.get('title').replace('\n','')
 
@@ -44,26 +78,23 @@ while(True):
 			print("done")
 			break
 
-		#if not title.startswith('Make:'):
-		#	print ('Skipping: {}'.format(str(title[:20])))
-		#	continue
-		
 		for regex in targets:
 			if regex.search(title):
 				print('*** MATCH ***')
 				print(title)
+				sendEmail(title)
 
 		if not first and title.startswith('Make:'):
 			first = id			
 
 	
 	if id == last:
-		print("done")
+		print("and done")
 		break
 
 	pagenum += 1
 
 if first:
+	print('saving {} as current position'.format(first))
 	with open('scraper.last','w') as f:
-		print('saving {} as current position'.format(first))
 		f.write(first)
