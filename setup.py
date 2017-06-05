@@ -6,5 +6,5 @@ setup(name='scraper',
       author='Anatoly',
       author_email='anatoly.ivanov@gmail.com',
       url='http://www.python.org/sigs/distutils-sig/',
-      install_requires=['requests', 'lxml'],
+      install_requires=['requests', 'lxml==3.7.3'],
       )
