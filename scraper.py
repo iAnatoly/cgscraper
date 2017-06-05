@@ -65,6 +65,8 @@ class Scraper(object):
         if os.path.exists('scraper.last'):
             with open('scraper.last') as marker_file:
                 last = marker_file.readline().strip()
+        else:
+            last = None
 
         print('last: "{}"'.format(last))
 
