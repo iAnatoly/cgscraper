@@ -62,8 +62,9 @@ class Scraper(object):
         """ Implements scraping algorithm. """
 
         first = None
-        with open('scraper.last') as marker_file:
-            last = marker_file.readline().strip()
+        if os.path.exists('scraper.last'):
+            with open('scraper.last') as marker_file:
+                last = marker_file.readline().strip()
 
         print('last: "{}"'.format(last))
 
