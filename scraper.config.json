@@ -3,7 +3,8 @@
 	"scraping_targets": [
                 "cz.*shadow", 
                 "tactical\\s+sport",
-                "tacsport"
+                "tacsport",
+		"cz 83b"
 	],
 	"email":{
 		"recipients":[
